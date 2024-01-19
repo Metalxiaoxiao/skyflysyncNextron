@@ -1,0 +1,12 @@
+appId: com.skyflysync.nextron
+productName: SkyFlySync
+copyright: Copyright © 2023 Zhufeng890
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - from: .
+    filter:
+      - package.json
+      - app
+publish: null

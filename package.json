@@ -1,0 +1,35 @@
+{
+  "private": true,
+  "name": "skyflysync",
+  "description": "My application description",
+  "version": "1.0.0",
+  "author": "Yoshihide Shiono <shiono.yoshihide@gmail.com>",
+  "main": "app/background.js",
+  "scripts": {
+    "dev": "nextron",
+    "build": "nextron build",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.11.3",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.15.3",
+    "@mui/material": "^5.15.3",
+    "electron-serve": "^1.1.0",
+    "electron-store": "^8.1.0",
+    "react-draggable": "^4.4.6"
+  },
+  "devDependencies": {
+    "@ant-design/icons": "^4.7.0",
+    "@types/node": "^18.11.18",
+    "@types/react": "^18.0.26",
+    "antd": "5.12.8",
+    "electron": "^26.2.2",
+    "electron-builder": "^24.6.4",
+    "next": "^12.3.4",
+    "nextron": "^8.12.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^5.2.2"
+  }
+}
