@@ -24,7 +24,7 @@ const Schedule = () => {
             setCurrentClass(msg)
         })
         window.ipc.invoke('getClassesByDay').then((data)=>{
-            setSchedule(data);
+setSchedule(data)
         })
     }, []);
     const today = new Date().toLocaleDateString();
@@ -32,25 +32,12 @@ const Schedule = () => {
     const todayEvents = scheduleData.map(event => ({ ...event, date: today }));
 
     return (
-
-            // <Steps progressDot current={1}>
-            //     <Step title="Finished" description="This is a description." />
-            //     <Step title="In Progress" description="This is a description." />
-            //     <Step title="Waiting" description="This is a description." />
-            // </Steps>
-            // <Divider />
-            // <Steps progressDot current={1} direction="vertical">
-            //     <Step title="Finished" description="This is a description. This is a description." />
-            //     <Step title="Finished" description="This is a description. This is a description." />
-            //     <Step title="In Progress" description="This is a description. This is a description." />
-            //     <Step title="Waiting" description="This is a description." />
-            //     <Step title="Waiting" description="This is a description." />
-            // </Steps>
-            <Card style={{ width: 150 }}>
+            <Card style={{ width: 130 }}>
                 <Steps progressDot current={currentClass} direction="vertical">
-                {todayEvents.map((event, index) => (
-                    <Step key={event.turn} title={event.subject} description={event.time} />
-                ))}
+                {todayEvents.map((event, index) => {
+                    if (event.show){return (<Step key={event.turn} title={event.subject} description={event.time} />)}
+                }
+                )}
                 </Steps>
             </Card>
     );

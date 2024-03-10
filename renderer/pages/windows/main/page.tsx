@@ -1,7 +1,7 @@
 'use client'
 import React, { useEffect, useState } from 'react';
 import VirtualList from 'rc-virtual-list';
-import { Avatar, Card, List, Button, Layout, Menu, message, Space, QRCode, Row, Col, Popover, Switch, TimePicker, Progress } from 'antd';
+import { Avatar, Card, List, Button, Layout, Menu, message, Space, QRCode, Row, Col, Popover, Switch, TimePicker, Progress, Flex } from 'antd';
 import { MessageOutlined, SettingOutlined } from '@ant-design/icons';
 const { Header, Content, Sider } = Layout;
 const { Meta } = Card;
@@ -11,6 +11,8 @@ import dayjs from 'dayjs';
 import TextField from "@mui/material/TextField";
 import { Layout as Lo } from '../layout';
 import { Margin } from '@mui/icons-material';
+import { ipcMain } from 'electron';
+import defauleConfig from '../../../../main/config'
 
 interface MessageItem {
     id: number;
@@ -26,6 +28,7 @@ interface MessageItem {
 
 const MessageList: React.FC = () => {
     const [messageData, setMessageData] = useState([]);
+    const [config , setConfig] = useState(defauleConfig);
     const [activeTab, setActiveTab] = useState<'messages' | 'settings'>('messages');
 
     const appendData = async () => {
@@ -49,6 +52,9 @@ const MessageList: React.FC = () => {
         })
         window.ipc.invoke('getUserData').then((data) => {
             setUserData(data);
+        })
+        window.ipc.invoke('getConfig').then((data)=>{
+            setConfig(data);
         })
     }, []);
 
@@ -84,21 +90,25 @@ const MessageList: React.FC = () => {
     return (
         <Lo>
             <Layout style={{ maxHeight: '78vh' }}>
-                <Sider width={70} theme="light">
-                    <Menu mode="vertical" defaultSelectedKeys={['messages']}>
-                        <Menu.Item onClick={() => handleTabChange('messages')} key="messages" icon={<MessageOutlined />} style={{ alignSelf: 'flex-end' }}>
+                <Sider width={110} theme="light">
+                <Flex style={{ width: 111 }} justify='flex-start' align='flex-start'>
+            <Menu style={{ width: 111 }} defaultSelectedKeys={['messages']}>
+                        <Menu.Item style={{ width: 90,alignSelf: 'flex-start'}} onClick={() => handleTabChange('messages')} key="messages" icon={<MessageOutlined />}>
+                        消息
                         </Menu.Item>
-                        <Menu.Item onClick={() => handleTabChange('settings')} key="settings" icon={<SettingOutlined />} style={{ alignSelf: 'flex-end' }}>
+                        <Menu.Item style={{ width: 90,alignSelf: 'flex-start'}} onClick={() => handleTabChange('settings')} key="settings" icon={<SettingOutlined />}>
+                        设置
                         </Menu.Item>
 
                     </Menu>
+      </Flex>
                 </Sider>
-                <Content style={{ margin: '8px', overflowY: 'auto', maxHeight: '75vh', minHeight: '75vh' }}>
+                <Content style={{ margin: 8, overflowY: 'auto', maxHeight: '75vh', minHeight: '75vh' }}>
                     {messageData.length > 0 || activeTab !== 'messages' ? null : <Empty></Empty>}
                     {activeTab === 'messages' && (
                         <><VirtualList
                             data={messageData}
-                            itemHeight={100} // Adjust the itemHeight as per your requirement
+                            itemHeight={100}
                             itemKey={(item: MessageItem) => String(item.id)}
                             onScroll={onScroll}
                         >
@@ -170,12 +180,25 @@ const MessageList: React.FC = () => {
                                 </div>
                             </Col>
                             <Card title="功能设置" bordered={false} style={{ margin: 10 }}>
-                                <Col><Space><Switch defaultChecked onChange={() => { }} /><p>使用课程表</p></Space></Col>
-                                <Col><Space><Switch defaultChecked onChange={() => { }} /><p>开启消息提示</p></Space></Col>
-                                <Col><Space><Switch defaultChecked onChange={() => { }} /><p>自习作业展示</p></Space></Col>
+                                <Col><Space><Switch defaultChecked onChange={(checked:boolean) => {window.ipc.invoke("setScheduleWindowDisplay",checked)}} /><p>使用课程表</p></Space></Col>
+                                <Col><Space><Switch defaultChecked onChange={(checked:boolean) => {
+                                    let tempConfig = config;
+                                    tempConfig.allowAlert = checked;
+                                    window.ipc.invoke("setConfig",tempConfig);
+                                }
+                                    } /><p>开启消息提示</p></Space></Col>
+                                <Col><Space><Switch defaultChecked onChange={(checked:boolean) => {
+                                    let tempConfig = config;
+                                    tempConfig.autoShowHomework = checked;
+                                    window.ipc.invoke("setConfig",tempConfig);
+                                    }} /><p>自习作业展示</p></Space></Col>
                             </Card>
                             <Card title="定时任务设置" bordered={false} style={{ margin: 10 }}>
-                                <Col><Space><Switch style={{ margin: 20 }} defaultChecked onChange={() => { }} /><p>开启定时任务</p></Space>
+                                <Col><Space><Switch style={{ margin: 20 }} defaultChecked onChange={(checked:boolean) => {
+                                    let tempConfig = config;
+                                    tempConfig.useTasks = checked;
+                                    window.ipc.invoke("setConfig",tempConfig);
+                                }} /><p>开启定时任务</p></Space>
                                 </Col>
                                 <Col>
                                     <TimePicker onChange={() => { }} defaultOpenValue={dayjs('00:00:00', 'HH:mm:ss')} />

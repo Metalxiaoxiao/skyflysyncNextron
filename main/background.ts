@@ -3,7 +3,10 @@ import fs from 'fs'
 import http from 'http'
 import { app, ipcMain } from 'electron'
 import serve from 'electron-serve'
+import defaultConfig from './config'
 import { createWindow } from './helpers'
+
+let config = defaultConfig;
 
 const isProd = process.env.NODE_ENV === 'production'
 
@@ -13,6 +16,15 @@ if (isProd) {
   app.setPath('userData', `${app.getPath('userData')} (development)`)
 }
 
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  app.quit()
+}
+
+app.on('second-instance', (event, commandLine, workingDirectory) => {
+  showMainWindow();
+})
 async function LoadPage(window,pageRute:string) {
   if (isProd) {
     await window.loadURL('app://.'+pageRute+'/page')
@@ -26,7 +38,7 @@ function downloadFileByHashValue(filehash){
   const fs = require('fs');
   const http = require('http');
   const fileUrl = 'http://106.53.58.190/'+filehash;
-  const targetPath = 'downloads';
+  const targetPath = config.fileSavingPath;
   http.get(fileUrl, (response) => {
   
   const fileStream = fs.createWriteStream(targetPath);
@@ -41,12 +53,13 @@ function downloadFileByHashValue(filehash){
 
 }
 
-const { BrowserWindow} = require('electron');
+const { BrowserWindow } = require('electron');
 const Store = require('electron-store');
 const { exec } = require('child_process');
 const WebSocket = require('ws');
 let store = new Store()
 app.commandLine.appendSwitch('wm-window-animations-disabled');
+
 let loginWindow;
 let loadWindow;
 let dialogWindow;
@@ -72,11 +85,39 @@ const _classStorageByDay = 'classOnDay'
 const _messageStorageList = 'messageList'
 const _homeWorkStorageByDay = 'homeworkOnDay'
 const _tasksStorage = 'tasksEachDay'
+const _configData = 'config'
+
+let storedConfig = store.get(_configData)
+config = storedConfig?storedConfig:config;
+
+function saveConfig(){
+  store.set(_configData,config)
+}
 
 let tasks = store.get(_tasksStorage);
 tasks = tasks?tasks:[
   // { cmd: "任务1", time: Date.now() + 5000 }
 ];
+
+let classes = store.get(_classStorageByDay+String(new Date().getDay()));
+if (classes == undefined){
+  classes = [{turn:1 , time: '07:40', subject: '语文',show:true },
+  {turn:2, time: '08:30', subject: '英语',show:true },
+  {turn:3, time: '09:20', subject: '数学',show:true },
+  {turn:4, time: '10:00', subject: '大课间',show:false },
+  {turn:5, time: '10:30', subject: '自习',show:true },
+  {turn:6, time: '11:20', subject: '数学',show:true },
+  {turn:7, time: '13:15', subject: '午休' ,show:false },
+  {turn:8, time: '14:30', subject: '政治',show:true },
+  {turn:9, time: '15:20', subject: '物理',show:true },
+  {turn:10, time: '16:10', subject: '自习',show:true },
+  {turn:11, time: '16:50', subject: '大课间',show:false },
+  {turn:12, time: '17:20', subject: '化学',show:true },
+  {turn:13, time: '19:30', subject: '自习',show:true },
+  {turn:14, time: '20:10', subject: '自习' ,show:true},
+  {turn:15, time: '21:10', subject: '自习' ,show:true},];
+}
+
 
 function compareTimes(time1, time2) {
   const [hours1, minutes1] = time1.split(':').map(Number);
@@ -164,10 +205,12 @@ function startWebSocketConnection() {
 
     let message = JSON.parse(evt.data)
     globalMessageObj = message;
-    console.log('NEXTJSmessage:',nextJSData)
     console.log('Received message from server:', message);
     switch (message.command) {
       case "login":
+        if (message.status === 'error'){
+          sendObj(store.get('loginDataPack'))
+        }
         if (message.status === 'success'){
           loginWindow? loginWindow.close() :null;
           loadWindow? loadWindow.close():null;
@@ -176,53 +219,12 @@ function startWebSocketConnection() {
           store.set('userId',message.content.userId)
           userId = message.content.userId;
           userName = message.content.userName;
-          mainWindow = new BrowserWindow({
-            frame: false,
-            width: 800,
-            height: 600,
-            alwaysOnTop: false,
-            autoHideMenuBar:true,
-            transparent: true,
-            webPreferences: {
-              nodeIntegration: false,
-              contextIsolation: true,
-              preload: path.join(__dirname, 'preload.js'),
-            },
-          })
-          LoadPage(mainWindow,'/windows/main')
-          mainWindow.once('ready-to-show',()=>{
-            mainWindow.show();
-          })
-          mainWindow.on('closed', () => {
-            mainWindow = null;
-          });
-          let x = store.get('schedule_x');
-          let y = store.get('schedule_y');
-          let width =  store.get('schedule_width');
-          let height =  store.get('schedule_height');
-          scheduleWindow = new BrowserWindow({
-            frame:false,
-            width: width?width:170,
-            height: height?height:660,
-            x: x?x:1400,
-            y: y?y:80,
-            alwaysOnTop:true,
-            webPreferences: {
-              nodeIntegration: false,
-              contextIsolation: true,
-              preload: path.join(__dirname, 'preload.js'),
-            },
-          });
-          scheduleWindow.setSkipTaskbar(true)
-          LoadPage(scheduleWindow,'/schedule')
-          scheduleWindow.once('ready-to-show',()=>{
-            scheduleWindow.show();
-          })
 
-
-
+          showMainWindow();
+          showScheduleWindow();
 
           const intervalInMilliseconds = 5000; // 2秒钟
+
 
           setInterval(() => {
             const currentTime = Date.now();
@@ -235,59 +237,57 @@ function startWebSocketConnection() {
             store.set('schedule_height',winset[1]);
         }
 
-            // 遍历任务数组
-            tasks.forEach(task => {
-              let classes = store.get(_classStorageByDay+String(new Date().getDay()));
-              classes = classes?classes:[{turn:1 , time: '08:00', subject: '语文' },
-                {turn:2, time: '09:00', subject: '数学' },
-                {turn:3, time: '10:00', subject: '英语' },
-                {turn:4, time: '11:00', subject: '物理' },
-                {turn:5, time: '12:00', subject: '化学' },
-                {turn:6, time: '13:00', subject: '政治' },
-                {turn:7, time: '14:00', subject: '历史' },
-                {turn:8, time: '15:00', subject: '地理' },
-                {turn:9, time: '16:00', subject: '生物' },];
-              let maxTurn = 0;
-              let date = new Date();
-              const hours = date.getHours().toString().padStart(2, '0');
-              const minutes = date.getMinutes().toString().padStart(2, '0');
-              classes.forEach((aclass)=>{
-                if(compareTimes(aclass.time,`${hours}:${minutes}`)<0){
-                  if (maxTurn<=aclass.turn){
-                    maxTurn = aclass.turn;
-                  }
-                }
-              })
-              scheduleWindow.webContents.send('updateCurrentClass',maxTurn-1)
-              if ((homeworkWindow == null) && classes[maxTurn-1]?.subject === '自习' && homeworkWindowClosed === false){
-                homeworkWindow = new BrowserWindow({
-                  fullscreen:true,
-                  autoHideMenuBar:true,
-                  webPreferences: {
-                    nodeIntegration: false,
-                    contextIsolation: true,
-                    preload: path.join(__dirname, 'preload.js'),
-                  },
-                })
-                LoadPage(homeworkWindow,'/homework')
-                homeworkWindow.once('ready-to-show',()=>{
-                  homeworkWindow.show();
-                })
-                homeworkWindow.on('closed', () => {
-                  homeworkWindow = null;
-                });
-              }
-              if(!(classes[maxTurn-1]?.subject == '自习')){
-                homeworkWindow?homeworkWindow.close():null;
-              }
-
-              // 检查当前时间是否在任务时间允许的误差范围内
-              if (Math.abs(task.time - currentTime) <= 10000) {
-                // 执行任务
-
-                console.log(`${task.cmd} 在 ${new Date(task.time)} 执行`);
-              }
+        let maxTurn = 0;
+        let date = new Date();
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        classes.forEach((aclass)=>{
+          if(compareTimes(aclass.time,`${hours}:${minutes}`)<0){
+            if (maxTurn<=aclass.turn){
+              maxTurn = aclass.turn;
+            }
+          }
+        })
+        let msg = {
+          classList:classes
+        }
+        scheduleWindow.webContents.send('updateClasses', msg)
+        scheduleWindow.webContents.send('updateCurrentClass',maxTurn-1)
+        if(config.autoShowHomework){
+          if ((homeworkWindow == null) && classes[maxTurn-1]?.subject === '自习' && homeworkWindowClosed === false){
+            homeworkWindow = new BrowserWindow({
+              fullscreen:true,
+              autoHideMenuBar:true,
+              webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js'),
+              },
+            })
+            LoadPage(homeworkWindow,'/homework')
+            homeworkWindow.once('ready-to-show',()=>{
+              homeworkWindow.show();
+            })
+            homeworkWindow.on('closed', () => {
+              homeworkWindow = null;
             });
+          }
+          if(!(classes[maxTurn-1]?.subject == '自习')){
+            homeworkWindow?homeworkWindow.close():null;
+          }
+        }
+        if(config.useTasks){
+           // 遍历任务数组
+           tasks.forEach(task => {
+            // 检查当前时间是否在任务时间允许的误差范围内
+            if (Math.abs(task.time - currentTime) <= 10000) {
+              // 执行任务
+
+              console.log(`${task.cmd} 在 ${new Date(task.time)} 执行`);
+            }
+          });
+        }
+           
           }, intervalInMilliseconds);
         }else{
           if (message.message === '用户不存在'){
@@ -323,30 +323,36 @@ function startWebSocketConnection() {
               globalMessageList.push(msgObj)
               store.set(_messageStorageList,JSON.stringify(globalMessageList));
               mainWindow?mainWindow.webContents.send('onMessage', msgObj):null;
-              
+              if(config.autoDownloadFiles){
+                content.attachments.forEach((attachment)=>{
+                  downloadFileByHashValue(attachment.hashValue)
+                })
+              }
             break
           case 'alertMessage':
             lastDialogMessage = content;
-            dialogWindow = new BrowserWindow({
-              frame: false,
-              width: 590,
-              height: 500,
-              alwaysOnTop: false,
-              transparent: true,
-              autoHideMenuBar:true,
-              webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true,
-                preload: path.join(__dirname, 'preload.js'),
-              },
-            })
-            LoadPage(dialogWindow,'/windows/Dialog')
-            dialogWindow.once('ready-to-show',()=>{
-              dialogWindow.show();
-            })
-            dialogWindow.on('closed', () => {
-              dialogWindow = null;
-            });
+            if(config.allowAlert){
+              dialogWindow = new BrowserWindow({
+                frame: false,
+                width: 590,
+                height: 500,
+                alwaysOnTop: false,
+                transparent: true,
+                autoHideMenuBar:true,
+                webPreferences: {
+                  nodeIntegration: false,
+                  contextIsolation: true,
+                  preload: path.join(__dirname, 'preload.js'),
+                },
+              })
+              LoadPage(dialogWindow,'/windows/Dialog')
+              dialogWindow.once('ready-to-show',()=>{
+                dialogWindow.show();
+              })
+              dialogWindow.on('closed', () => {
+                dialogWindow = null;
+              });
+            }
             break
           case 'classUpdateMessage':
             scheduleWindow?scheduleWindow.webContents.send('updateClasses', content.data):null;
@@ -366,7 +372,11 @@ function startWebSocketConnection() {
 
             break//可以换成remote excute
           case 'fileMessage':
-            
+            if(config.autoDownloadFiles){
+              content.attachments.forEach((attachment)=>{
+                downloadFileByHashValue(attachment.hashValue)
+              })
+            }
             break
           case 'timerTaskMessage':
             tasks.push(content.data);
@@ -386,10 +396,16 @@ function startWebSocketConnection() {
 
   ws.onclose = (event) => {
     console.error(`WebSocket connection closed with code ${event.code}. Reconnecting...`);
+    clearInterval(reconnectInterval);
     reconnectInterval = setInterval(() => {
       startWebSocketConnection();
     }, 3000);
   };
+  ws.onerror = ()=>{
+    reconnectInterval = setInterval(() => {
+      startWebSocketConnection();
+    }, 3000);
+  }
 }
 
 function AlertToWindow(Window, msg){
@@ -403,6 +419,55 @@ function AlertToWindow(Window, msg){
 function sendObj(Obj){
   ws.send(JSON.stringify(Obj))
   console.log("sending message:",Obj);
+}
+
+function showScheduleWindow(){
+  let x = store.get('schedule_x');
+  let y = store.get('schedule_y');
+  let width =  store.get('schedule_width');
+  let height =  store.get('schedule_height');
+  scheduleWindow = new BrowserWindow({
+    frame:false,
+    width: width?width:170,
+    height: height?height:660,
+    x: x?x:1400,
+    y: y?y:80,
+    alwaysOnTop:true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+  scheduleWindow.setSkipTaskbar(true)
+  LoadPage(scheduleWindow,'/schedule')
+  scheduleWindow.once('ready-to-show',()=>{
+    if (config.isScheduleShow){
+      scheduleWindow.show();
+    }
+  })
+}
+function showMainWindow() {
+  mainWindow = new BrowserWindow({
+    frame: false,
+    width: 800,
+    height: 600,
+    alwaysOnTop: false,
+    autoHideMenuBar:true,
+    transparent: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  })
+  LoadPage(mainWindow,'/windows/main')
+  mainWindow.once('ready-to-show',()=>{
+    mainWindow.show();
+  })
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 }
 
 app.whenReady().then(() => {
@@ -462,8 +527,7 @@ app.whenReady().then(() => {
     // ]
   })
   ipcMain.handle('getClassesByDay', (event)=>{
-    let classes = store.get(_classStorageByDay+String(new Date().getDay()));
-    return classes?classes:[];
+    return classes;
   })
   ipcMain.handle('getTasks', (event)=>{
     let tasks = store.get(_tasksStorage);
@@ -478,6 +542,22 @@ app.whenReady().then(() => {
   ipcMain.handle('setStorage', (event,name,arg)=>{
     store.set(name,arg);
     return true;
+  })
+  ipcMain.handle('setScheduleWindowDisplay', (event,display)=>{
+    if(display == true){
+        scheduleWindow.show()
+    }else if (display == false){
+      scheduleWindow.minimize();
+    }
+    config.isScheduleShow = display
+    saveConfig()
+    return true;
+  })
+
+  ipcMain.handle('getConfig',()=>{ return config})
+  ipcMain.handle('setConfig',(event,newconfig)=>{
+    config = newconfig
+    saveConfig();
   })
   
   ipcMain.on('closeHomeworkWindow',()=>{

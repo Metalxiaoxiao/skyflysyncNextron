@@ -11,7 +11,7 @@ const HomeworkPage = () => {
         window.ipc.invoke('getHomeworkData').then((data)=>{
             setHomeworkData(data);
         })
-        window.ipc.on('uploadHomework',(evt,homework)=>{
+        window.ipc.on('uploadHomework',(homework)=>{
             setHomeworkData([...homeworkData,homework]);
         })
     }, []);

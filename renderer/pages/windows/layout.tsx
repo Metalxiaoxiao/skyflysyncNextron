@@ -33,7 +33,7 @@ export const Layout = ({children,}: {
             <Card
                 title={
                     <div className="drag-handle">
-                        SkyFlySync
+                        SkyFlySync 课堂管理系统
                     </div>
                 }
                 bordered={false}
