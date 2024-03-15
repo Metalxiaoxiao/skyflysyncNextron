@@ -1,8 +1,8 @@
 'use client'
-import React, { useEffect, useState } from 'react';
+import React, { ReactNode, useEffect, useState } from 'react';
 import VirtualList from 'rc-virtual-list';
-import { Avatar, Card, List, Button, Layout, Menu, message, Space, QRCode, Row, Col, Popover, Switch, TimePicker, Progress, Flex } from 'antd';
-import { MessageOutlined, SettingOutlined } from '@ant-design/icons';
+import { Avatar, Card, List, Button, Layout, Menu, message, Space, QRCode, Row, Col, Popover, Switch, TimePicker, Progress, Flex, Typography, Divider, Dropdown } from 'antd';
+import { CaretDownOutlined, DownOutlined, FileOutlined, MessageOutlined, MoreOutlined, SettingOutlined } from '@ant-design/icons';
 const { Header, Content, Sider } = Layout;
 const { Meta } = Card;
 import { Empty } from 'antd';
@@ -13,6 +13,7 @@ import { Layout as Lo } from '../layout';
 import { Margin } from '@mui/icons-material';
 import { ipcMain } from 'electron';
 import defauleConfig from '../../../../main/config'
+import Icon from '@ant-design/icons/lib/components/Icon';
 
 interface MessageItem {
     id: number;
@@ -20,16 +21,39 @@ interface MessageItem {
     sender: string;
     content: string;
     attachments?: {
-        filename: string;
         url: string;
+        filename: string;
+        hashValue: string;
     }[];
 }
 
+interface task {
+    description: string;
+    id: number;
+    cmd: string;
+}
+
+const items = [
+    {
+      key: '1',
+      label: (
+        <a target="_blank" rel="noopener noreferrer" href="https://www.antgroup.com">
+          1st menu item
+        </a>
+      ),
+    },
+    {
+      key: '4',
+      danger: true,
+      label: 'a danger item',
+    },
+  ];
 
 const MessageList: React.FC = () => {
     const [messageData, setMessageData] = useState([]);
-    const [config , setConfig] = useState(defauleConfig);
+    const [config, setConfig] = useState(defauleConfig);
     const [activeTab, setActiveTab] = useState<'messages' | 'settings'>('messages');
+    const [tasks, setTasks] = useState()
 
     const appendData = async () => {
         await window.ipc.invoke('getMessages').then((data) => {
@@ -50,10 +74,17 @@ const MessageList: React.FC = () => {
             setTimeout(() => { document.location.href = '#bottom' }, 2000)
 
         })
+        window.ipc.on('download-progress', ({progress,hashValue} ) => {
+            alert("收到进度:"+progress+"|"+hashValue)
+            setDownloadProgresses((prevProgresses) => ({
+                ...prevProgresses,
+                [hashValue]: progress , // 更新对应的下载进度
+            }));
+        });
         window.ipc.invoke('getUserData').then((data) => {
             setUserData(data);
         })
-        window.ipc.invoke('getConfig').then((data)=>{
+        window.ipc.invoke('getConfig').then((data) => {
             setConfig(data);
         })
     }, []);
@@ -64,20 +95,8 @@ const MessageList: React.FC = () => {
         tab == 'messages' ? setTimeout(() => { document.location.href = '#bottom' }, 80) : null;
     };
 
-    const handleDownload = (url: string, filename: string) => {
-        fetch(url)
-            .then((response) => response.blob())
-            .then((blob) => {
-                const link = document.createElement('a');
-                link.href = window.URL.createObjectURL(new Blob([blob]));
-                link.setAttribute('download', filename);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            })
-            .catch((error) => {
-                console.error('Error downloading file:', error);
-            });
+    const handleDownload = (hashValue: string, filename: string) => {
+        window.ipc.send('download-file',hashValue,filename)
     };
 
 
@@ -87,21 +106,26 @@ const MessageList: React.FC = () => {
         }
     };
 
+    const [downloadProgresses, setDownloadProgresses] = useState({})
+
+
     return (
         <Lo>
             <Layout style={{ maxHeight: '78vh' }}>
                 <Sider width={110} theme="light">
-                <Flex style={{ width: 111 }} justify='flex-start' align='flex-start'>
-            <Menu style={{ width: 111 }} defaultSelectedKeys={['messages']}>
-                        <Menu.Item style={{ width: 90,alignSelf: 'flex-start'}} onClick={() => handleTabChange('messages')} key="messages" icon={<MessageOutlined />}>
-                        消息
-                        </Menu.Item>
-                        <Menu.Item style={{ width: 90,alignSelf: 'flex-start'}} onClick={() => handleTabChange('settings')} key="settings" icon={<SettingOutlined />}>
-                        设置
-                        </Menu.Item>
-
-                    </Menu>
-      </Flex>
+                    <Flex style={{ width: 111 }} justify='flex-start' align='flex-start'>
+                        <Menu style={{ width: 111 }} defaultSelectedKeys={['messages']}>
+                            <Menu.Item style={{ width: 90, alignSelf: 'flex-start' }} onClick={() => handleTabChange('messages')} key="messages" icon={<MessageOutlined />}>
+                                消息
+                            </Menu.Item>
+                            <Menu.Item style={{ width: 90, alignSelf: 'flex-start' }} onClick={() => handleTabChange('settings')} key="settings" icon={<SettingOutlined />}>
+                                设置
+                            </Menu.Item>
+                            <Menu.Item style={{ width: 90, alignSelf: 'flex-start' }} onClick={() =>{window.ipc.invoke('openHomeworkWindow')}} icon={<SettingOutlined />}>
+                                作业
+                            </Menu.Item>
+                        </Menu>
+                    </Flex>
                 </Sider>
                 <Content style={{ margin: 8, overflowY: 'auto', maxHeight: '75vh', minHeight: '75vh' }}>
                     {messageData.length > 0 || activeTab !== 'messages' ? null : <Empty></Empty>}
@@ -120,28 +144,31 @@ const MessageList: React.FC = () => {
                                             title={item.title}
                                             description={<>
                                                 <p>{`发送者： ${item.sender}`}</p>
+                                                <Divider></Divider>
                                                 <p>{item.content}</p>
                                                 {item.attachments && item.attachments.length > 0 && (
                                                     <>
-                                                        <p>附件：</p>
-                                                        <ul>
-                                                            {item.attachments.map((attachment, index) => (
-                                                                <li key={index}>
-                                                                    <Space wrap>
-                                                                        <Progress type="circle" percent={30} size={80} />
-                                                                        <Progress type="circle" percent={70} size={80} status="exception" />
-                                                                        <Progress type="circle" percent={100} size={80} />
+                                                        <p>附件:</p>
+                                                            {item.attachments.map((attachment, index) => {
+                                                                // setDownloadProgresses({
+                                                                //     ...downloadProgresses,
+                                                                //     [attachment.hashValue]: 0,
+                                                                // })
+                                                                return (
+                                                                        <><Space wrap>
+                                                                        <Button
+                                                                            icon={downloadProgresses[attachment.hashValue] ? (<Progress type="circle" percent={downloadProgresses[attachment.hashValue]} size={20} />) : (<FileOutlined />)}
+                                                                            style={{ margin: '5px', maxWidth: 430 }}
+                                                                            type="dashed"
+                                                                            onClick={() => handleDownload(attachment.hashValue, attachment.filename)}
+                                                                        >
+                                                                            {attachment.filename.length > 50 ? attachment.filename.slice(0, 50) + "..." : attachment.filename}
+                                                                        </Button>
                                                                     </Space>
-                                                                    <Button
-                                                                        style={{ margin: '5px' }}
-                                                                        type="dashed"
-                                                                        onClick={() => handleDownload(attachment.url, attachment.filename)}
-                                                                    >
-                                                                        {attachment.filename}
-                                                                    </Button>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
+                                                                    </>
+                                                                )
+                                                            }
+                                                            )}
                                                     </>
                                                 )}
                                             </>} />
@@ -180,27 +207,43 @@ const MessageList: React.FC = () => {
                                 </div>
                             </Col>
                             <Card title="功能设置" bordered={false} style={{ margin: 10 }}>
-                                <Col><Space><Switch defaultChecked onChange={(checked:boolean) => {window.ipc.invoke("setScheduleWindowDisplay",checked)}} /><p>使用课程表</p></Space></Col>
-                                <Col><Space><Switch defaultChecked onChange={(checked:boolean) => {
+                                <Col><Space><Switch defaultChecked onChange={(checked: boolean) => { window.ipc.invoke("setScheduleWindowDisplay", checked) }} /><p>使用课程表</p></Space></Col>
+                                <Col><Space><Switch defaultChecked onChange={(checked: boolean) => {
                                     let tempConfig = config;
                                     tempConfig.allowAlert = checked;
-                                    window.ipc.invoke("setConfig",tempConfig);
+                                    window.ipc.invoke("setConfig", tempConfig);
                                 }
-                                    } /><p>开启消息提示</p></Space></Col>
-                                <Col><Space><Switch defaultChecked onChange={(checked:boolean) => {
+                                } /><p>开启消息提示</p></Space></Col>
+                                <Col><Space><Switch defaultChecked onChange={(checked: boolean) => {
                                     let tempConfig = config;
                                     tempConfig.autoShowHomework = checked;
-                                    window.ipc.invoke("setConfig",tempConfig);
-                                    }} /><p>自习作业展示</p></Space></Col>
+                                    window.ipc.invoke("setConfig", tempConfig);
+                                }} /><p>自习作业展示</p></Space></Col>
+                                <Col><Space><Switch defaultChecked onChange={(checked: boolean) => {
+                                    let tempConfig = config;
+                                    tempConfig.autoDownloadFiles = checked;
+                                    window.ipc.invoke("setConfig", tempConfig);
+                                }} /><p>自动下载文件</p></Space></Col>
                             </Card>
                             <Card title="定时任务设置" bordered={false} style={{ margin: 10 }}>
-                                <Col><Space><Switch style={{ margin: 20 }} defaultChecked onChange={(checked:boolean) => {
+                                <Col><Space><Switch style={{ margin: 20 }} defaultChecked onChange={(checked: boolean) => {
                                     let tempConfig = config;
                                     tempConfig.useTasks = checked;
-                                    window.ipc.invoke("setConfig",tempConfig);
+                                    window.ipc.invoke("setConfig", tempConfig);
                                 }} /><p>开启定时任务</p></Space>
                                 </Col>
                                 <Col>
+                                    <List
+                                        header={<div>任务列表</div>}
+                                        footer={<div><Button>添加任务</Button></div>}
+                                        bordered
+                                        dataSource={tasks}
+                                        renderItem={(item : task) => (
+                                            <List.Item>
+                                                <Typography.Text mark>[计划任务]</Typography.Text> {item.description}
+                                            </List.Item>
+                                        )}
+                                    />
                                     <TimePicker onChange={() => { }} defaultOpenValue={dayjs('00:00:00', 'HH:mm:ss')} />
                                 </Col>
                             </Card>
