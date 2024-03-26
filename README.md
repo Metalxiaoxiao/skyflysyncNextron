@@ -1,4 +1,4 @@
-#SkyFlySyncNextron 白板客户端
+# SkyFlySyncNextron 白板客户端
 
 ## 使用
 
@@ -18,6 +18,3 @@ $ yarn dev (or `npm run dev` or `pnpm run dev`)
 $ yarn build (or `npm run build` or `pnpm run build`)
 ```
 
-## UI
-
-<https://ant.design>
