@@ -1,9 +1,9 @@
 'use client'
 // 在你的 React 组件中引入所需的模块
-import { Card, Button } from 'antd';
+import { Card, Button, Alert, Flex } from 'antd';
 import {LineOutlined, CloseOutlined } from '@ant-design/icons';
 import Draggable from 'react-draggable';
-import React, {useEffect} from "react";
+import React, {useEffect, useState} from "react";
 
 const { Meta } = Card;
 
@@ -12,9 +12,12 @@ const { Meta } = Card;
 export const Layout = ({children,}: {
     children: React.ReactNode
 }) => {
+    const [networkState,setNetworkState] = useState(true);
     useEffect(() => {
         const listenFromMain = window.ipc.on('main-message', (message) => {
-
+        window.ipc.on('nerworkState',(event,state:boolean)=>{
+            setNetworkState(state);
+        })
         });
         window.ipc.on('alert', (event, message) => {
             alert(message);
@@ -37,13 +40,25 @@ export const Layout = ({children,}: {
                     </div>
                 }
                 bordered={false}
-                extra={<><Button
+                extra={
+                
+    <Flex align='center' gap={10}>
+        {
+            networkState?null:<Alert
+            message="网络连接已断开"
+            type="warning"
+            showIcon
+          />
+        }
+        
+    <Flex align='center'>    <Button
                     type="text"
                     icon={<LineOutlined/>}
                     onClick={handleMinimize}/><Button
                     type="text"
                     icon={<CloseOutlined/>}
-                    onClick={handleClose}/></>
+                    onClick={handleClose}/></Flex>
+</Flex>
                 }
             >
                 {children}

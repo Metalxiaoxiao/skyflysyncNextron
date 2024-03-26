@@ -33,7 +33,7 @@ setSchedule(data)
 
     return (
             <Card style={{ width: 130 }}>
-                <Steps progressDot current={currentClass} direction="vertical">
+                <Steps size={todayEvents.length>11?'small':'default'} progressDot current={currentClass} direction="vertical">
                 {todayEvents.map((event, index) => {
                     if (event.show){return (<Step key={event.turn} title={event.subject} description={event.time} />)}
                 }

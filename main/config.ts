@@ -3,7 +3,7 @@ let defaultConfig = {
     allowAlert: true,
     useTasks: true,
     autoDownloadFiles: true,
-    fileSavingPath :'downloads',
+    fileSavingPath :'./downloads/',
     autoShowHomework: true,
   }
   
