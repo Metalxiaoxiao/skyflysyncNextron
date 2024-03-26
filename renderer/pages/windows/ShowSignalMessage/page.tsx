@@ -9,9 +9,9 @@ const WarningCard = () => {
     const [sender,setSender] = useState(" ");
     useEffect(() => {
         window.ipc.invoke('getShowingMessage').then((data)=>{
-            setContent(data.content.data.content)
-            setTitle(data.content.data.title)
-            setSender(data.content.data.sender)
+            setContent(data.content)
+            setTitle(data.title)
+            setSender(data.sender)
         })
     }, []);
     return (

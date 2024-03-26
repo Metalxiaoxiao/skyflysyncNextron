@@ -305,7 +305,7 @@ function showShowSignalMessageWindow() {
       preload: path.join(__dirname, 'preload.js'),
     },
   })
-  LoadPage(OPwindows.mainWindow, '/windows/ShowSignalMessageWindow')
+  LoadPage(OPwindows.mainWindow, '/windows/ShowSignalMessage')
   OPwindows.mainWindow.once('ready-to-show', () => {
     OPwindows.mainWindow.show();
   })

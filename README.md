@@ -1,42 +1,23 @@
-<p align="center"><img src="https://i.imgur.com/NrkTPe9.png"></p>
+#SkyFlySyncNextron 白板客户端
 
-## Usage
+## 使用
 
-### Create an App
-
-```
-# with npx
-$ npx create-nextron-app my-app --example with-ant-design
-
-# with yarn
-$ yarn create nextron-app my-app --example with-ant-design
-
-# with pnpm
-$ pnpm dlx create-nextron-app my-app --example with-ant-design
-```
-
-### Install Dependencies
+### 安装依赖
 
 ```
-$ cd my-app
-
-# using yarn or npm
-$ yarn (or `npm install`)
-
-# using pnpm
-$ pnpm install --shamefully-hoist
+$ npm install
 ```
 
-### Use it
+### 运行
 
 ```
-# development mode
+# 开发模式
 $ yarn dev (or `npm run dev` or `pnpm run dev`)
 
-# production build
+# 构建打包
 $ yarn build (or `npm run build` or `pnpm run build`)
 ```
 
-## Resources
+## UI
 
 <https://ant.design>
