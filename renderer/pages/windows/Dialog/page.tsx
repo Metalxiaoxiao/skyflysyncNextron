@@ -1,6 +1,6 @@
 'use client'
 import React, {useEffect, useState} from 'react';
-import { Card, Alert } from 'antd';
+import { Card, Alert, Flex } from 'antd';
 import Layout from '../layout';
 
 const WarningCard = () => {
@@ -15,10 +15,13 @@ const WarningCard = () => {
         })
     }, []);
     return (
-        <Layout><Card title={title} bordered={true} style={{width: 500}}>
-        {content}
+        <Layout>
+            
+            <Flex justify='center' align='center'><Card title={title} bordered={true} style={{width: 500}}>{content}</Card>
+                </Flex>
+        
 
-    </Card><Alert style={{margin: 10}} message={"本条由" + sender + "老师创建"} type="warning" showIcon/></Layout>
+    <Alert style={{margin: 10}} message={"本条由" + sender + "老师创建"} type="warning" showIcon/></Layout>
     );
 };
 

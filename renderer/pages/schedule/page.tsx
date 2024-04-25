@@ -17,14 +17,13 @@ const Schedule = () => {
     const [currentClass,setCurrentClass] = useState(0);
     useEffect(() => {
         window.ipc.on('updateClasses',(msg:{classList})=>{
-            setSchedule(msg.classList);
+            if(msg.classList){
+                setSchedule(msg.classList);
+
+            }
         })
         window.ipc.on('updateCurrentClass',(msg:SetStateAction<number>)=>{
-
             setCurrentClass(msg)
-        })
-        window.ipc.invoke('getClassesByDay').then((data)=>{
-setSchedule(data)
         })
     }, []);
     const today = new Date().toLocaleDateString();

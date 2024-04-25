@@ -1,7 +1,7 @@
 'use client'
 import React, { ReactNode, useEffect, useState } from 'react';
 import VirtualList from 'rc-virtual-list';
-import { Avatar, Card, List, Button, Layout, Menu, message, Space, QRCode, Row, Col, Popover, Switch, TimePicker, Progress, Flex, Typography, Divider, Dropdown, Input } from 'antd';
+import { Avatar, Card, List, Button, Layout, Menu, message, Space, QRCode, Row, Col, Popover, Switch, TimePicker, Progress, Flex, Typography, Divider, Dropdown, Input, ConfigProvider } from 'antd';
 import { BookOutlined, CaretDownOutlined, DownOutlined, DownloadOutlined, FileOutlined, MenuOutlined, MessageOutlined, MoreOutlined, SettingOutlined } from '@ant-design/icons';
 const { Header, Content, Sider } = Layout;
 const { Meta } = Card;
@@ -65,12 +65,12 @@ const MessageList: React.FC = () => {
                                     [attachment.hashValue]: 100,
                                 }
                             }
-                            setDownloadProgresses(downloadProgressesTemp)
+                            setDownloadProgresses({...downloadProgresses,...downloadProgressesTemp})
                         })
                     })
                 }
             });
-            setMessageData(messageData.concat(data));
+            setMessageData([...data,...messageData]);
             setLoadPointId(data[data.length-1].id)
             message.success(`${data.length} 条被加载!`);
             setTimeout(() => { document.location.href = '#loadPoint' }, 200)
@@ -193,7 +193,7 @@ const MessageList: React.FC = () => {
                         >
                             {(item: MessageItem) => (
                                 <List.Item key={item.id}>
-                                    <Card style={{ margin: 3 }}>
+                                    <Card  style={{ margin: 3 }}>
                                         <Flex justify='space-between' align='flex-start'>
                                             <Meta
 
@@ -238,38 +238,47 @@ const MessageList: React.FC = () => {
 
 
                                                     return (
-                                                        <Card type="inner">
+                                                        <ConfigProvider
+                                theme={{
+                                  components: {
+                                    Card: {
+                                        colorBgContainer:"#fafafa"
+                                    },
+                                  },
+                                }}
+                              ><Card type="inner">
 
-                                                            <Flex justify='space-between' align='center'>
-                                                                <Flex gap={15}><FileOutlined></FileOutlined><h4>{attachment.filename.length > 32 ? attachment.filename.substring(0, 32) + "..." : attachment.filename}</h4></Flex>
-                                                                {
-                                                                    downloadProgresses[attachment.hashValue] ?
-                                                                        downloadProgresses[attachment.hashValue] == 100 ?
-                                                                            <Flex gap={5}><Button
-                                                                                onClick={() => handleOpen(item.sender, attachment.filename)}
-                                                                            >
-                                                                                打开
-                                                                            </Button>
-                                                                                <Button
-                                                                                    onClick={() => handleOpenFolder(item.sender)}>
-                                                                                    打开文件夹
-                                                                                </Button></Flex> :
-                                                                            null
-                                                                        : <Button
-                                                                            icon={<DownloadOutlined />}
-                                                                            style={{ margin: '5px', maxWidth: 430 }}
-                                                                            type="dashed"
-                                                                            onClick={() => handleDownload(attachment.hashValue, attachment.filename, item.sender)}
-                                                                        >
-                                                                            下载
-                                                                        </Button>
-                                                                }
+                              <Flex justify='space-between' align='center'>
+                                  <Flex gap={15}><FileOutlined></FileOutlined><h4>{attachment.filename.length > 32 ? attachment.filename.substring(0, 32) + "..." : attachment.filename}</h4></Flex>
+                                  {
+                                      downloadProgresses[attachment.hashValue] ?
+                                          downloadProgresses[attachment.hashValue] == 100 ?
+                                              <Flex gap={5}><Button
+                                                  onClick={() => handleOpen(item.sender, attachment.filename)}
+                                              >
+                                                  打开
+                                              </Button>
+                                                  <Button
+                                                      onClick={() => handleOpenFolder(item.sender)}>
+                                                      打开文件夹
+                                                  </Button></Flex> :
+                                              null
+                                          : <Button
+                                              icon={<DownloadOutlined />}
+                                              style={{ margin: '5px', maxWidth: 430 }}
+                                              type="dashed"
+                                              onClick={() => handleDownload(attachment.hashValue, attachment.filename, item.sender)}
+                                          >
+                                              下载
+                                          </Button>
+                                  }
 
-                                                            </Flex>
-                                                            {
-                                                                downloadProgresses[attachment.hashValue] ? (<><Progress status={downloadProgresses[attachment.hashValue] == -1 ? 'exception' : downloadProgresses[attachment.hashValue] == 100 ? 'success' : 'active'} percent={downloadProgresses[attachment.hashValue].toFixed(1)} /></>) :
-                                                                    null}
-                                                        </Card>
+                              </Flex>
+                              {
+                                  downloadProgresses[attachment.hashValue] ? (<><Progress status={downloadProgresses[attachment.hashValue] == -1 ? 'exception' : downloadProgresses[attachment.hashValue] == 100 ? 'success' : 'active'} percent={downloadProgresses[attachment.hashValue].toFixed(1)} /></>) :
+                                      null}
+                          </Card></ConfigProvider>
+                                                        
 
                                                     )
                                                 }
@@ -329,7 +338,7 @@ const MessageList: React.FC = () => {
                                     tempConfig.autoDownloadFiles = checked;
                                     window.ipc.invoke("setConfig", tempConfig);
                                 }} /><p>自动下载文件</p></Space></Col>
-                                <Input placeholder="./downloads" />
+                                
                             </Card>
                             <Card title="定时任务设置" bordered={false} style={{ margin: 10 }}>
                                 <Col><Space><Switch style={{ margin: 20 }} defaultChecked onChange={(checked: boolean) => {

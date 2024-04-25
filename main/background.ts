@@ -7,6 +7,7 @@ import defaultConfig from './config'
 import { createWindow } from './helpers'
 import { sendError } from 'next/dist/server/api-utils'
 import { message } from 'antd'
+import { time } from 'console'
 
 interface MessageItem {
   id: number;
@@ -140,16 +141,16 @@ let isLogined = false;
 let nextJSData: { command: string; content: { userPassword: any } };
 let reconnectInterval: string | number | NodeJS.Timeout;
 
-let globalMessageObj: MessageItem
+let globalMessageObj: any
 let globalMessageList: MessageItem[]
-let lastDialogMessage: MessageItem
+let lastDialogMessage: any
 
 let userId: any
 let userName: any
 
 const _classStorageByDay = 'classOnDay'
 const _messageStorageList = 'messageList'
-const _homeWorkStorageByDay = 'homeworkOnDay'
+const _homeWorkStorageByDay = 'homeworkOnDay'+String(new Date().getUTCDate())
 const _tasksStorage = 'tasksEachDay'
 const _configData = 'config'
 
@@ -167,7 +168,15 @@ tasks = tasks ? tasks : [
 ];
 
 let classes = store.get(_classStorageByDay + String(new Date().getDay()));
-if (classes == undefined) {
+
+let classChache = null;
+try{
+  classChache = classes[0].show;
+}catch{
+  
+}
+
+if (!classChache || !classes){
   classes = [
     { turn: 1, time: '07:40', subject: '语文', show: true },
     { turn: 2, time: '08:30', subject: '英语', show: true },
@@ -185,8 +194,10 @@ if (classes == undefined) {
     { turn: 14, time: '20:10', subject: '自习', show: true },
     { turn: 15, time: '21:10', subject: '自习', show: true },
   ];
+  store.set(_classStorageByDay + String(new Date().getDay())+"1000",classes);
 }
 
+console.log("获取到的课程表:",classes)
 
 function compareTimes(time1: { split: (arg0: string) => { (): any; new(): any; map: { (arg0: NumberConstructor): [any, any]; new(): any } } }, time2: string) {
   const [hours1, minutes1] = time1.split(':').map(Number);
@@ -380,6 +391,8 @@ function startWebSocketConnection() {
         });
 
       }
+    }else{
+        sendObj(store.get('loginDataPack'))
     }
 
   };
@@ -393,7 +406,7 @@ function startWebSocketConnection() {
         if (message.status === 'error') {
           sendObj(store.get('loginDataPack'))
         }
-        if (message.status === 'success') {
+        if (message.status === 'success' && isLogined == false) {
           OPwindows.loginWindow ? OPwindows.loginWindow.close() : null;
           OPwindows.loadWindow ? OPwindows.loadWindow.close() : null;
           isLogined = true
@@ -406,10 +419,12 @@ function startWebSocketConnection() {
           showscheduleWindow();
 
           const intervalInMilliseconds = 5000; // 2秒钟
-
+          sendObj({
+            command:'getOfflineData',
+            content:{}
+          })
 
           setInterval(() => {
-            ws.send("heartTick");
             const currentTime = Date.now();
             if (OPwindows.scheduleWindow) {
               let position = OPwindows.scheduleWindow.getPosition();
@@ -437,7 +452,7 @@ function startWebSocketConnection() {
             OPwindows.scheduleWindow.webContents.send('updateClasses', msg)
             OPwindows.scheduleWindow.webContents.send('updateCurrentClass', maxTurn - 1)
             if (config.autoShowHomework) {
-              if ((OPwindows.homeworkWindow == null) && classes[maxTurn - 1]?.subject === '自习' && homeworkWindowClosed === false) {
+              if ((OPwindows.homeworkWindow == null) && classes[maxTurn]?.subject === '自习' && homeworkWindowClosed === false) {
                 showhomeworkWindow();
               }
               if (!(classes[maxTurn - 1]?.subject == '自习')) {
@@ -486,21 +501,11 @@ function startWebSocketConnection() {
       case 'sendMessage':
         let content = message.content;
         switch (content.type) {
-          case 'ordinaryMessage':
-            let msgObj = content.data;
-            globalMessageList.push(msgObj)
-            store.set(_messageStorageList, globalMessageList);
-            OPwindows.mainWindow ? OPwindows.mainWindow.webContents.send('onMessage', msgObj) : null;
-            if (config.autoDownloadFiles) {
-              msgObj.attachments.forEach((attachment: { hashValue: string, filename: string }) => {
-                downloadFileByHashValue(OPwindows.mainWindow.webContents, attachment.hashValue, attachment.filename, msgObj.sender)
-              })
-            }
-            break
+
           case 'alertMessage':
             lastDialogMessage = content;
             if (config.allowAlert) {
-              OPwindows.dialogWindow = new BrowserWindow({
+              let temp = new BrowserWindow({
                 frame: false,
                 width: 590,
                 height: 500,
@@ -513,28 +518,57 @@ function startWebSocketConnection() {
                   preload: path.join(__dirname, 'preload.js'),
                 },
               })
-              LoadPage(OPwindows.dialogWindow, '/windows/Dialog')
-              OPwindows.dialogWindow.once('ready-to-show', () => {
-                OPwindows.dialogWindow.show();
+              LoadPage(temp, '/windows/Dialog')
+              temp.once('ready-to-show', () => {
+                temp.show();
               })
-              OPwindows.dialogWindow.on('closed', () => {
-                OPwindows.dialogWindow = null;
+              temp.on('closed', () => {
+                temp = null;
               });
             }
+            case 'ordinaryMessage':
+              let msgObj = content.data;
+              globalMessageList.push(msgObj)
+              store.set(_messageStorageList, globalMessageList);
+              OPwindows.mainWindow ? OPwindows.mainWindow.webContents.send('onMessage', msgObj) : null;
+              if (config.autoDownloadFiles) {
+                msgObj.attachments.forEach((attachment: { hashValue: string, filename: string }) => {
+                  downloadFileByHashValue(OPwindows.mainWindow.webContents, attachment.hashValue, attachment.filename, msgObj.sender)
+                })
+              }
             break
           case 'classUpdateMessage':
             OPwindows.scheduleWindow ? OPwindows.scheduleWindow.webContents.send('updateClasses', content.data) : null;
             if (content.data) {
+              classes = content.data.classList;
               store.set(_classStorageByDay + content.data.day, content.data.classList)
+
             }
             break
           case 'remoteExecuteMessage':
+            // const { exec } = require('child_process');
+
+            // let pptPath = 'C:\\path\\to\\your\\presentation.pptx'; 
+            
+            // let command = `powershell "Start-Process 'POWERPNT.EXE' '-S ${pptPath}'"`;
+            
+            // exec(command, (err, stdout, stderr) => {
+            //   if (err) {
+            //     // 出错处理
+            //     console.error(err);
+            //     return;
+            //   }
+            //   // 成功输出
+            //   console.log(stdout);
+            // });
+
             let cmd = content.data.cmd;
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
                 console.error(`执行命令时发生错误: ${error}`);
                 return;
               }
+
               console.log(`命令执行成功，输出: ${stdout}`);
             });
 
@@ -551,33 +585,49 @@ function startWebSocketConnection() {
             store.set(_tasksStorage, tasks);
             break
           case 'homeworkMessage':
-            let date = new Date().getDay();
             let homework = content.data;
-            let homeworks = store.get(_homeWorkStorageByDay + date);
+            let homeworks = store.get(_homeWorkStorageByDay);
+            console.log("获取今日作业"+ _homeWorkStorageByDay)
+            console.log(homeworks)
             homeworks = homeworks ? [...homeworks, homework] : [homework];
-            store.set(_homeWorkStorageByDay + date, homeworks);
+            store.set(_homeWorkStorageByDay,homeworks);
+            console.log("保存今日作业"+ _homeWorkStorageByDay)
+            console.log(homeworks)
             OPwindows.homeworkWindow ? OPwindows.homeworkWindow.webContents.send('uploadHomework', homework) : null;
+            OPwindows.smallhomeworkWindow ? OPwindows.smallhomeworkWindow.webContents.send('uploadHomework', homework) : null;
+            break;
+          case 'getMessages':
+            sendObj({
+              command:'sendMessage',
+              content:{
+                recipient:content.requester
+                
+              }
+            })
+          
         }
         break;
+        case 'heart':
+            console.log('heart hited : ',message.timeStamp)
     }
   };
 
   ws.onclose = (event: { code: any }) => {
     console.error(`WebSocket connection closed with code ${event.code}. Reconnecting...`);
-    clearInterval(reconnectInterval);
+    // clearInterval(reconnectInterval);
     OPwindows.mainWindow ? OPwindows.mainWindow.webContents.send('networkState', false) : null;
-    reconnectInterval = setInterval(() => {
-      startWebSocketConnection();
+    // reconnectInterval = setInterval(() => {
+    //   startWebSocketConnection();
 
-    }, 3000);
-    reconn++;
+    // }, 3000);
+    // reconn++;
   };
   ws.onerror = () => {
     OPwindows.mainWindow ? OPwindows.mainWindow.webContents.send('networkState', false) : null;
-    reconnectInterval = setInterval(() => {
-      startWebSocketConnection();
-    }, 3000);
-    reconn++;
+    // reconnectInterval = setInterval(() => {
+    //   startWebSocketConnection();
+    // }, 3000);
+    // reconn++;
   }
 }
 
@@ -594,14 +644,27 @@ function sendObj(Obj: { command: string; content: any }) {
   console.log("sending message:", Obj);
 }
 
-
-
 app.whenReady().then(() => {
   globalMessageList = store.get(_messageStorageList) ? store.get(_messageStorageList) : [];
   //init
-  startWebSocketConnection();
   userId = store.get('userId');
   userName = store.get('userName');
+  startWebSocketConnection();
+  setInterval(()=>{
+    try {
+      ws.send(JSON.stringify({
+        command:'heart',
+        content:{
+          timeStamp: Date.now(),
+        }
+      }))
+      //心跳包
+    }catch{
+      startWebSocketConnection();
+      //断线重连
+    }
+  },5000)
+
   // IPC Area
   ipcMain.handle('getLastMessage', (event, args) => {
     return globalMessageObj;
@@ -617,7 +680,9 @@ app.whenReady().then(() => {
     };
   })
   ipcMain.handle('getHomeworkData', () => {
-    let homeworks = store.get(_homeWorkStorageByDay + new Date().getDay())
+    let homeworks = store.get(_homeWorkStorageByDay)
+    console.log("获取今日作业"+ _homeWorkStorageByDay)
+    console.log(homeworks)
     return homeworks ? homeworks : [];
   })
 
@@ -705,7 +770,7 @@ app.whenReady().then(() => {
     return true;
   })
 
-  ipcMain.handle('scheduleWindowDisplay', (event, display) => {
+  ipcMain.handle('setScheduleWindowDisplay', (event, display) => {
     if (display == true) {
       OPwindows.scheduleWindow.show()
     } else if (display == false) {
@@ -721,11 +786,12 @@ app.whenReady().then(() => {
     config = newconfig
     saveConfig();
   })
-  ipcMain.handle('openhomeworkWindow', () => {
+  ipcMain.handle('openHomeworkWindow', () => {
     showsmallhomeworkWindow()
   })
 
-  ipcMain.on('closehomeworkWindow', () => {
+  ipcMain.on('closeHomeworkWindow', () => {
+    console.log("attached")
     if (OPwindows.homeworkWindow) {
       homeworkWindowClosed = true;
       OPwindows.homeworkWindow.close();
