@@ -40,7 +40,9 @@ if (!gotTheLock) {
 }
 
 app.on('second-instance', (event, commandLine, workingDirectory) => {
-  showmainWindow();
+  if(isLogined){
+   showmainWindow(); 
+  }
 })
 async function LoadPage(window: { loadURL: (arg0: string) => any }, pageRute: string) {
   if (isProd) {
@@ -119,6 +121,7 @@ interface RenderWindows {
   homeworkWindow: Electron.CrossProcessExports.BrowserWindow;
   smallhomeworkWindow: Electron.CrossProcessExports.BrowserWindow;
   signalMessageWindow: Electron.CrossProcessExports.BrowserWindow;
+  floatingWindow: Electron.CrossProcessExports.BrowserWindow;
 
 }
 
@@ -131,6 +134,7 @@ let OPwindows: RenderWindows = {
   homeworkWindow: null,
   smallhomeworkWindow: null,
   signalMessageWindow: null,
+  floatingWindow: null,
 };
 
 
@@ -148,13 +152,15 @@ let lastDialogMessage: any
 let userId: any
 let userName: any
 
+let lastHeartTimeStamp: number
+
 const _classStorageByDay = 'classOnDay'
 const _messageStorageList = 'messageList'
-const _homeWorkStorageByDay = 'homeworkOnDay'+String(new Date().getUTCDate())
+const _homeWorkStorageByDay = 'homeworkOnDay' + String(new Date().getUTCDate())
 const _tasksStorage = 'tasksEachDay'
 const _configData = 'config'
 
-const _serverUrl = 'http://106.53.58.190:8900'
+const _serverUrl = 'http://106.53.58.190:8080'
 let storedConfig = store.get(_configData)
 config = storedConfig ? storedConfig : config;
 
@@ -170,13 +176,13 @@ tasks = tasks ? tasks : [
 let classes = store.get(_classStorageByDay + String(new Date().getDay()));
 
 let classChache = null;
-try{
+try {
   classChache = classes[0].show;
-}catch{
-  
+} catch {
+
 }
 
-if (!classChache || !classes){
+if (!classChache || !classes) {
   classes = [
     { turn: 1, time: '07:40', subject: '语文', show: true },
     { turn: 2, time: '08:30', subject: '英语', show: true },
@@ -194,10 +200,10 @@ if (!classChache || !classes){
     { turn: 14, time: '20:10', subject: '自习', show: true },
     { turn: 15, time: '21:10', subject: '自习', show: true },
   ];
-  store.set(_classStorageByDay + String(new Date().getDay())+"1000",classes);
+  store.set(_classStorageByDay + String(new Date().getDay()) + "1000", classes);
 }
 
-console.log("获取到的课程表:",classes)
+console.log("获取到的课程表:", classes)
 
 function compareTimes(time1: { split: (arg0: string) => { (): any; new(): any; map: { (arg0: NumberConstructor): [any, any]; new(): any } } }, time2: string) {
   const [hours1, minutes1] = time1.split(':').map(Number);
@@ -324,9 +330,58 @@ function showShowSignalMessageWindow() {
     OPwindows.mainWindow = null;
   });
 }
+function showFloatingWindow() {
+  OPwindows.floatingWindow = new BrowserWindow({
+    frame: false,
+    width: 300,
+    height: 100,
+    alwaysOnTop: true,
+    autoHideMenuBar: true,
+    transparent: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  })
+  LoadPage(OPwindows.floatingWindow, '/floatingWindow')
+  OPwindows.floatingWindow.once('ready-to-show', () => {
+    OPwindows.floatingWindow.show();
+  })
+  OPwindows.floatingWindow.on('closed', () => {
+    OPwindows.floatingWindow = null;
+  });
+}
+function showLoginWindow (){
+  OPwindows.loginWindow = new BrowserWindow({
+    transparent: true,
+    frame: false,
+    width: 420,
+    height: 490,
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+
+  LoadPage(OPwindows.loginWindow, '/windows/login')
+  console.log('登录窗口已加载')
+  OPwindows.loginWindow.once('ready-to-show', () => {
+    OPwindows.loginWindow.show();
+  })
+
+  OPwindows.loginWindow.on('closed', () => {
+    OPwindows.loginWindow = null;
+    if (isLogined === false) {
+      app.quit();
+    }
+  });
+}
 let reconn = 0;
 function startWebSocketConnection() {
-  ws = new WebSocket('ws://106.53.58.190:8900/ws');
+  ws = new WebSocket('ws://106.53.58.190:8080/ws');
 
   ws.onopen = () => {
 
@@ -359,73 +414,61 @@ function startWebSocketConnection() {
           OPwindows.mainWindow ? OPwindows.mainWindow.webContents.send('networkState', true) : null;
         }
         setTimeout(() => {
-          sendObj(store.get('loginDataPack'))
+          ws.send(JSON.stringify(store.get('loginDataPack')))
 
         }, 3000)
 
       } else {
-        OPwindows.loginWindow = new BrowserWindow({
-          transparent: true,
-          frame: false,
-          width: 420,
-          height: 490,
-          autoHideMenuBar: true,
-          webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js'),
-          },
-        });
-
-        LoadPage(OPwindows.loginWindow, '/windows/login')
-        console.log('登录窗口已加载')
-        OPwindows.loginWindow.once('ready-to-show', () => {
-          OPwindows.loginWindow.show();
-        })
-
-        OPwindows.loginWindow.on('closed', () => {
-          OPwindows.loginWindow = null;
-          if (isLogined === false) {
-            app.quit();
-          }
-        });
-
+        showLoginWindow()
       }
-    }else{
-        sendObj(store.get('loginDataPack'))
+    } else {
+      ws.send(JSON.stringify(store.get('loginDataPack')))
     }
 
   };
   ws.onmessage = (evt: { data: string }) => {
-
+    
     let message = JSON.parse(evt.data)
     globalMessageObj = message;
     console.log('Received message from server:', message);
-    switch (message.command) {
-      case "login":
-        if (message.status === 'error') {
-          sendObj(store.get('loginDataPack'))
-        }
-        if (message.status === 'success' && isLogined == false) {
+    if(isLogined == false){
+        if (message.state ==true) {
+          setInterval(() => {
+            console.log("heart beat")
+            try {
+              ws.send(JSON.stringify({
+                command: 'heart',
+                content: {
+                  timeStamp: Date.now(),
+                }
+              }))
+              //心跳包
+            } catch {
+              startWebSocketConnection();
+              //断线重连
+            }
+          }, 5000)
+          //登陆成功，启动心跳包机制
           OPwindows.loginWindow ? OPwindows.loginWindow.close() : null;
           OPwindows.loadWindow ? OPwindows.loadWindow.close() : null;
           isLogined = true
-          store.set('userName', message.content.userName);
-          store.set('userId', message.content.userId)
-          userId = message.content.userId;
-          userName = message.content.userName;
+          store.set('userName', message.userData.userName);
+          store.set('userId', message.userData.userId)
+          userId = message.userData.userId;
+          userName = message.userData.userName;
 
           showmainWindow();
           showscheduleWindow();
 
           const intervalInMilliseconds = 5000; // 2秒钟
           sendObj({
-            command:'getOfflineData',
-            content:{}
+            command: 'getOfflineMessage',
+            content: {}
           })
 
           setInterval(() => {
             const currentTime = Date.now();
+
             if (OPwindows.scheduleWindow) {
               let position = OPwindows.scheduleWindow.getPosition();
               store.set('schedule_x', position[0])
@@ -433,6 +476,13 @@ function startWebSocketConnection() {
               let winset = OPwindows.scheduleWindow.getSize();
               store.set('schedule_width', winset[0]);
               store.set('schedule_height', winset[1]);
+            }
+            if (config.showHeadBar) {
+              if (!OPwindows.floatingWindow) {
+                showFloatingWindow();
+              }
+            } else {
+              OPwindows.floatingWindow?OPwindows.floatingWindow.webContents.close():null;
             }
 
             let maxTurn = 0;
@@ -473,59 +523,41 @@ function startWebSocketConnection() {
 
           }, intervalInMilliseconds);
         } else {
-          if (message.message === '用户不存在') {
-            nextJSData.command = 'register'
-            sendObj(nextJSData)//自动注册
-          } else {
-            OPwindows.loginWindow ? AlertToWindow(OPwindows.loginWindow, '登录失败') : null;
-          }
+          //登录失败
+          setTimeout(() => {
+            ws.send(JSON.stringify(store.get('loginDataPack')))
+          }, 3000)
         }
-        break;
-      case 'register':
-        if (message.status === 'success') {
-          let loginDataPack = {
-            command: 'login',
-            content: {
-              userId: message.content.userId,
-              userName: message.content.userName,
-              userPassword: nextJSData.content.userPassword,
-              deviceType: 1
-            }
-          }
-          store.set('loginDataPack', loginDataPack)
-          sendObj(loginDataPack)//自动登录
-        } else {
-          OPwindows.loginWindow ? AlertToWindow(OPwindows.loginWindow, '注册失败') : null;
-        }
-        break
-      case 'sendMessage':
-        let content = message.content;
-        switch (content.type) {
-
-          case 'alertMessage':
-            lastDialogMessage = content;
-            if (config.allowAlert) {
-              let temp = new BrowserWindow({
-                frame: false,
-                width: 590,
-                height: 500,
-                alwaysOnTop: false,
-                transparent: true,
-                autoHideMenuBar: true,
-                webPreferences: {
-                  nodeIntegration: false,
-                  contextIsolation: true,
-                  preload: path.join(__dirname, 'preload.js'),
-                },
-              })
-              LoadPage(temp, '/windows/Dialog')
-              temp.once('ready-to-show', () => {
-                temp.show();
-              })
-              temp.on('closed', () => {
-                temp = null;
-              });
-            }
+    }else{  
+      switch (message.command) {
+        case 'sendMessage':
+          let content = message.content;
+          switch (content.type) {
+  
+            case 'alertMessage':
+              lastDialogMessage = content;
+              if (config.allowAlert) {
+                let temp = new BrowserWindow({
+                  frame: false,
+                  width: 590,
+                  height: 500,
+                  alwaysOnTop: false,
+                  transparent: true,
+                  autoHideMenuBar: true,
+                  webPreferences: {
+                    nodeIntegration: false,
+                    contextIsolation: true,
+                    preload: path.join(__dirname, 'preload.js'),
+                  },
+                })
+                LoadPage(temp, '/windows/Dialog')
+                temp.once('ready-to-show', () => {
+                  temp.show();
+                })
+                temp.on('closed', () => {
+                  temp = null;
+                });
+              }
             case 'ordinaryMessage':
               let msgObj = content.data;
               globalMessageList.push(msgObj)
@@ -536,79 +568,87 @@ function startWebSocketConnection() {
                   downloadFileByHashValue(OPwindows.mainWindow.webContents, attachment.hashValue, attachment.filename, msgObj.sender)
                 })
               }
-            break
-          case 'classUpdateMessage':
-            OPwindows.scheduleWindow ? OPwindows.scheduleWindow.webContents.send('updateClasses', content.data) : null;
-            if (content.data) {
-              classes = content.data.classList;
-              store.set(_classStorageByDay + content.data.day, content.data.classList)
-
-            }
-            break
-          case 'remoteExecuteMessage':
-            // const { exec } = require('child_process');
-
-            // let pptPath = 'C:\\path\\to\\your\\presentation.pptx'; 
-            
-            // let command = `powershell "Start-Process 'POWERPNT.EXE' '-S ${pptPath}'"`;
-            
-            // exec(command, (err, stdout, stderr) => {
-            //   if (err) {
-            //     // 出错处理
-            //     console.error(err);
-            //     return;
-            //   }
-            //   // 成功输出
-            //   console.log(stdout);
-            // });
-
-            let cmd = content.data.cmd;
-            exec(cmd, (error: any, stdout: any, stderr: any) => {
-              if (error) {
-                console.error(`执行命令时发生错误: ${error}`);
-                return;
+              break
+            case 'classUpdateMessage':
+              OPwindows.scheduleWindow ? OPwindows.scheduleWindow.webContents.send('updateClasses', content.data) : null;
+              if (content.data) {
+                classes = content.data.classList;
+                store.set(_classStorageByDay + content.data.day, content.data.classList)
+  
               }
-
-              console.log(`命令执行成功，输出: ${stdout}`);
-            });
-
-            break//可以换成remote excute
-          case 'fileMessage':
-            if (config.autoDownloadFiles) {
-              content.attachments.forEach((attachment: { hashValue: string, filename: string }) => {
-                downloadFileByHashValue(OPwindows.mainWindow.webContents, attachment.hashValue, attachment.filename, msgObj.sender)
+              break
+            case 'remoteExecuteMessage':
+              // const { exec } = require('child_process');
+  
+              // let pptPath = 'C:\\path\\to\\your\\presentation.pptx'; 
+  
+              // let command = `powershell "Start-Process 'POWERPNT.EXE' '-S ${pptPath}'"`;
+  
+              // exec(command, (err, stdout, stderr) => {
+              //   if (err) {
+              //     // 出错处理
+              //     console.error(err);
+              //     return;
+              //   }
+              //   // 成功输出
+              //   console.log(stdout);
+              // });
+  
+              let cmd = content.data.cmd;
+              exec(cmd, (error: any, stdout: any, stderr: any) => {
+                if (error) {
+                  console.error(`执行命令时发生错误: ${error}`);
+                  return;
+                }
+  
+                console.log(`命令执行成功，输出: ${stdout}`);
+              });
+  
+              break//可以换成remote excute
+            case 'fileMessage':
+              if (config.autoDownloadFiles) {
+                content.attachments.forEach((attachment: { hashValue: string, filename: string }) => {
+                  downloadFileByHashValue(OPwindows.mainWindow.webContents, attachment.hashValue, attachment.filename, msgObj.sender)
+                })
+              }
+              break
+            case 'timerTaskMessage':
+              tasks.push(content.data);
+              store.set(_tasksStorage, tasks);
+              break
+            case 'homeworkMessage':
+              let homework = content.data;
+              let homeworks = store.get(_homeWorkStorageByDay);
+              console.log("获取今日作业" + _homeWorkStorageByDay)
+              console.log(homeworks)
+              homeworks = homeworks ? [...homeworks, homework] : [homework];
+              store.set(_homeWorkStorageByDay, homeworks);
+              console.log("保存今日作业" + _homeWorkStorageByDay)
+              console.log(homeworks)
+              OPwindows.homeworkWindow ? OPwindows.homeworkWindow.webContents.send('uploadHomework', homework) : null;
+              OPwindows.smallhomeworkWindow ? OPwindows.smallhomeworkWindow.webContents.send('uploadHomework', homework) : null;
+              break;
+            case 'getMessages':
+              sendObj({
+                command: 'sendMessage',
+                content: {
+                  recipient: content.requester
+  
+                }
               })
-            }
-            break
-          case 'timerTaskMessage':
-            tasks.push(content.data);
-            store.set(_tasksStorage, tasks);
-            break
-          case 'homeworkMessage':
-            let homework = content.data;
-            let homeworks = store.get(_homeWorkStorageByDay);
-            console.log("获取今日作业"+ _homeWorkStorageByDay)
-            console.log(homeworks)
-            homeworks = homeworks ? [...homeworks, homework] : [homework];
-            store.set(_homeWorkStorageByDay,homeworks);
-            console.log("保存今日作业"+ _homeWorkStorageByDay)
-            console.log(homeworks)
-            OPwindows.homeworkWindow ? OPwindows.homeworkWindow.webContents.send('uploadHomework', homework) : null;
-            OPwindows.smallhomeworkWindow ? OPwindows.smallhomeworkWindow.webContents.send('uploadHomework', homework) : null;
-            break;
-          case 'getMessages':
-            sendObj({
-              command:'sendMessage',
-              content:{
-                recipient:content.requester
-                
-              }
-            })
-          
-        }
-        break;
+  
+          }
+          break;
         case 'heart':
-            console.log('heart hited : ',message.timeStamp)
+          console.log('heart hited : ', message.timeStamp)
+          if (!lastHeartTimeStamp){
+            lastHeartTimeStamp = message.timeStamp;
+          }
+          if(message.timeStamp - lastHeartTimeStamp > 20308500){
+            startWebSocketConnection();
+          }
+          lastHeartTimeStamp = message.timeStamp;
+      }
     }
   };
 
@@ -650,26 +690,15 @@ app.whenReady().then(() => {
   userId = store.get('userId');
   userName = store.get('userName');
   startWebSocketConnection();
-  setInterval(()=>{
-    try {
-      ws.send(JSON.stringify({
-        command:'heart',
-        content:{
-          timeStamp: Date.now(),
-        }
-      }))
-      //心跳包
-    }catch{
-      startWebSocketConnection();
-      //断线重连
-    }
-  },5000)
+
+
+
 
   // IPC Area
   ipcMain.handle('getLastMessage', (event, args) => {
     return globalMessageObj;
   })
-  let showingMessage:MessageItem
+  let showingMessage: MessageItem
   ipcMain.handle('getShowingMessage', (event, args) => {
     return showingMessage;
   })
@@ -681,7 +710,7 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('getHomeworkData', () => {
     let homeworks = store.get(_homeWorkStorageByDay)
-    console.log("获取今日作业"+ _homeWorkStorageByDay)
+    console.log("获取今日作业" + _homeWorkStorageByDay)
     console.log(homeworks)
     return homeworks ? homeworks : [];
   })
@@ -821,7 +850,7 @@ app.whenReady().then(() => {
     showingMessage = message;
     showShowSignalMessageWindow();
   })
-  
+
   ipcMain.on('nextjs-message', (event, data) => {
     if (ws.readyState === WebSocket.OPEN) {
       nextJSData = data;
@@ -829,6 +858,20 @@ app.whenReady().then(() => {
     } else {
       console.error('WebSocket connection is not open');
     }
+  });
+  ipcMain.on('registerSuccess', (event, resData) => {
+    let loginDataPack = {
+        userId: resData.userId,
+        userName: resData.userName,
+        password: resData.password,
+    }
+    store.set('loginDataPack', loginDataPack)
+    try{
+      ws.send(JSON.stringify(loginDataPack))//自动登录
+    } catch {
+      startWebSocketConnection();
+    }
+    
   });
   ipcMain.on('minimize-window', () => {
     const selectedWindow = BrowserWindow.getFocusedWindow();

@@ -5,6 +5,7 @@ let defaultConfig = {
     autoDownloadFiles: true,
     fileSavingPath :'./downloads/',
     autoShowHomework: true,
+    showHeadBar:false,
   }
   
   export default defaultConfig ;

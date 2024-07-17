@@ -42,36 +42,41 @@ const MessageList: React.FC = () => {
     const [config, setConfig] = useState(defauleConfig);
     const [activeTab, setActiveTab] = useState<'messages' | 'settings'>('messages');
     const [tasks, setTasks] = useState()
-    const [getMsgStarter,setGetMsgStarter] = useState(-11);
-    const [loadPointId,setLoadPointId] = useState(0);
+    const [getMsgStarter, setGetMsgStarter] = useState(-11);
+    const [loadPointId, setLoadPointId] = useState(0);
 
     const appendData = async () => {
-        await window.ipc.invoke('getMessages',getMsgStarter).then(([data,newStarter]) => {
+        await window.ipc.invoke('getMessages', getMsgStarter).then(([data, newStarter]) => {
             setGetMsgStarter(newStarter);
-            if(!data){
+            if (!data) {
                 message.warning("没有更多了")
                 return;
             }
-            
+
             let downloadProgressesTemp = {};
             data.forEach(item => {
-                if(item.attachments && item.attachments.length > 0){
-                    item.attachments.forEach(attachment=>{
+                if (item.attachments && item.attachments.length > 0) {
+                    item.attachments.forEach(attachment => {
                         window.ipc.invoke('checkFileExistance', item.sender, attachment.filename).then((existance) => {
-                            
+
                             if (existance) {
                                 downloadProgressesTemp = {
                                     ...downloadProgressesTemp,
                                     [attachment.hashValue]: 100,
                                 }
                             }
-                            setDownloadProgresses({...downloadProgresses,...downloadProgressesTemp})
+                            setDownloadProgresses({ ...downloadProgresses, ...downloadProgressesTemp })
                         })
                     })
                 }
             });
-            setMessageData([...data,...messageData]);
-            setLoadPointId(data[data.length-1].id)
+            setMessageData([...data, ...messageData]);
+            if (!data[data.length - 1]) {
+                setLoadPointId(0)
+            } else {
+                setLoadPointId(data[data.length - 1].id)
+            }
+
             message.success(`${data.length} 条被加载!`);
             setTimeout(() => { document.location.href = '#loadPoint' }, 200)
         })
@@ -132,31 +137,31 @@ const MessageList: React.FC = () => {
         window.ipc.invoke('openFolder', sender)
     }
 
-    function fullScreenDisplay(msgid:number){
-        messageData.forEach((msg:MessageItem)=>{
-            if(msgid == msg.id){
-                window.ipc.invoke('showSignalMessage',msg)
+    function fullScreenDisplay(msgid: number) {
+        messageData.forEach((msg: MessageItem) => {
+            if (msgid == msg.id) {
+                window.ipc.invoke('showSignalMessage', msg)
             }
         })
     }
 
-    function DeleteMessage(msgid:number){
-        messageData.forEach((msg:MessageItem,index)=>{
-            if(msgid == msg.id){
+    function DeleteMessage(msgid: number) {
+        messageData.forEach((msg: MessageItem, index) => {
+            if (msgid == msg.id) {
                 let temp = [...messageData];
-                temp.splice(index,1);
+                temp.splice(index, 1);
                 setMessageData(temp);
-                window.ipc.invoke('delete-message',msgid).then((state)=>{
-                    if(state == true){   
-                        message.success("删除成功")  
+                window.ipc.invoke('delete-message', msgid).then((state) => {
+                    if (state == true) {
+                        message.success("删除成功")
                     }
                 })
             }
-        })  
+        })
     }
 
     const onScroll = (e: React.UIEvent<HTMLElement, UIEvent>) => {
-        if (e.currentTarget.scrollTop == 0&& activeTab == 'messages') {
+        if (e.currentTarget.scrollTop == 0 && activeTab == 'messages') {
             appendData();
         }
     };
@@ -189,11 +194,11 @@ const MessageList: React.FC = () => {
                             data={messageData}
                             itemHeight={100}
                             itemKey={(item: MessageItem) => item.id}
-                             
+
                         >
                             {(item: MessageItem) => (
                                 <List.Item key={item.id}>
-                                    <Card  style={{ margin: 3 }}>
+                                    <Card style={{ margin: 3 }}>
                                         <Flex justify='space-between' align='flex-start'>
                                             <Meta
 
@@ -206,14 +211,14 @@ const MessageList: React.FC = () => {
                                                 menu={{
                                                     items: [
                                                         {
-                                                            label: <a onClick={()=>{fullScreenDisplay(item.id)}}>详细信息</a>,
+                                                            label: <a onClick={() => { fullScreenDisplay(item.id) }}>详细信息</a>,
                                                             key: '0',
                                                         },
                                                         {
                                                             type: 'divider',
                                                         },
                                                         {
-                                                            label: <a onClick={()=>{DeleteMessage(item.id)}}>删除</a>,
+                                                            label: <a onClick={() => { DeleteMessage(item.id) }}>删除</a>,
                                                             key: '1',
                                                             danger: true,
                                                         },
@@ -233,52 +238,52 @@ const MessageList: React.FC = () => {
                                         {item.attachments && item.attachments.length > 0 && (
                                             <>
                                                 {item.attachments.map((attachment, index) => {
-                                                    
+
 
 
 
                                                     return (
                                                         <ConfigProvider
-                                theme={{
-                                  components: {
-                                    Card: {
-                                        colorBgContainer:"#fafafa"
-                                    },
-                                  },
-                                }}
-                              ><Card type="inner">
+                                                            theme={{
+                                                                components: {
+                                                                    Card: {
+                                                                        colorBgContainer: "#fafafa"
+                                                                    },
+                                                                },
+                                                            }}
+                                                        ><Card type="inner">
 
-                              <Flex justify='space-between' align='center'>
-                                  <Flex gap={15}><FileOutlined></FileOutlined><h4>{attachment.filename.length > 32 ? attachment.filename.substring(0, 32) + "..." : attachment.filename}</h4></Flex>
-                                  {
-                                      downloadProgresses[attachment.hashValue] ?
-                                          downloadProgresses[attachment.hashValue] == 100 ?
-                                              <Flex gap={5}><Button
-                                                  onClick={() => handleOpen(item.sender, attachment.filename)}
-                                              >
-                                                  打开
-                                              </Button>
-                                                  <Button
-                                                      onClick={() => handleOpenFolder(item.sender)}>
-                                                      打开文件夹
-                                                  </Button></Flex> :
-                                              null
-                                          : <Button
-                                              icon={<DownloadOutlined />}
-                                              style={{ margin: '5px', maxWidth: 430 }}
-                                              type="dashed"
-                                              onClick={() => handleDownload(attachment.hashValue, attachment.filename, item.sender)}
-                                          >
-                                              下载
-                                          </Button>
-                                  }
+                                                                <Flex justify='space-between' align='center'>
+                                                                    <Flex gap={15}><FileOutlined></FileOutlined><h4>{attachment.filename.length > 32 ? attachment.filename.substring(0, 32) + "..." : attachment.filename}</h4></Flex>
+                                                                    {
+                                                                        downloadProgresses[attachment.hashValue] ?
+                                                                            downloadProgresses[attachment.hashValue] == 100 ?
+                                                                                <Flex gap={5}><Button
+                                                                                    onClick={() => handleOpen(item.sender, attachment.filename)}
+                                                                                >
+                                                                                    打开
+                                                                                </Button>
+                                                                                    <Button
+                                                                                        onClick={() => handleOpenFolder(item.sender)}>
+                                                                                        打开文件夹
+                                                                                    </Button></Flex> :
+                                                                                null
+                                                                            : <Button
+                                                                                icon={<DownloadOutlined />}
+                                                                                style={{ margin: '5px', maxWidth: 430 }}
+                                                                                type="dashed"
+                                                                                onClick={() => handleDownload(attachment.hashValue, attachment.filename, item.sender)}
+                                                                            >
+                                                                                下载
+                                                                            </Button>
+                                                                    }
 
-                              </Flex>
-                              {
-                                  downloadProgresses[attachment.hashValue] ? (<><Progress status={downloadProgresses[attachment.hashValue] == -1 ? 'exception' : downloadProgresses[attachment.hashValue] == 100 ? 'success' : 'active'} percent={downloadProgresses[attachment.hashValue].toFixed(1)} /></>) :
-                                      null}
-                          </Card></ConfigProvider>
-                                                        
+                                                                </Flex>
+                                                                {
+                                                                    downloadProgresses[attachment.hashValue] ? (<><Progress status={downloadProgresses[attachment.hashValue] == -1 ? 'exception' : downloadProgresses[attachment.hashValue] == 100 ? 'success' : 'active'} percent={downloadProgresses[attachment.hashValue].toFixed(1)} /></>) :
+                                                                        null}
+                                                            </Card></ConfigProvider>
+
 
                                                     )
                                                 }
@@ -286,7 +291,7 @@ const MessageList: React.FC = () => {
                                             </>
                                         )}
                                     </Card>
-                                    {loadPointId == item.id?<div id="loadPoint"></div>:null}
+                                    {loadPointId == item.id ? <div id="loadPoint"></div> : null}
                                 </List.Item>
                             )}
 
@@ -321,29 +326,43 @@ const MessageList: React.FC = () => {
                                 </div>
                             </Col>
                             <Card title="功能设置" bordered={false} style={{ margin: 10 }}>
-                                <Col><Space><Switch defaultChecked onChange={(checked: boolean) => { window.ipc.invoke("setScheduleWindowDisplay", checked) }} /><p>使用课程表</p></Space></Col>
-                                <Col><Space><Switch defaultChecked onChange={(checked: boolean) => {
+                                <Col><Space><Switch defaultChecked={config.isScheduleShow} onChange={(checked: boolean) => { 
+                                    let tempConfig = config;
+                                    tempConfig.isScheduleShow = checked;
+                                    setConfig(tempConfig);
+                                    window.ipc.invoke("setScheduleWindowDisplay", checked) }} /><p>使用课程表</p></Space></Col>
+                                <Col><Space><Switch defaultChecked={config.allowAlert} onChange={(checked: boolean) => {
                                     let tempConfig = config;
                                     tempConfig.allowAlert = checked;
+                                    setConfig(tempConfig);
                                     window.ipc.invoke("setConfig", tempConfig);
                                 }
                                 } /><p>开启消息提示</p></Space></Col>
-                                <Col><Space><Switch defaultChecked onChange={(checked: boolean) => {
+                                <Col><Space><Switch defaultChecked={config.autoShowHomework} onChange={(checked: boolean) => {
                                     let tempConfig = config;
                                     tempConfig.autoShowHomework = checked;
+                                    setConfig(tempConfig);
                                     window.ipc.invoke("setConfig", tempConfig);
                                 }} /><p>自习作业展示</p></Space></Col>
-                                <Col><Space><Switch defaultChecked onChange={(checked: boolean) => {
+                                <Col><Space><Switch defaultChecked={config.autoDownloadFiles} onChange={(checked: boolean) => {
                                     let tempConfig = config;
                                     tempConfig.autoDownloadFiles = checked;
+                                    setConfig(tempConfig);
                                     window.ipc.invoke("setConfig", tempConfig);
                                 }} /><p>自动下载文件</p></Space></Col>
-                                
+                                <Col><Space><Switch defaultChecked={config.showHeadBar} onChange={(checked: boolean) => {
+                                    let tempConfig = config;
+                                    tempConfig.showHeadBar = checked;
+                                    setConfig(tempConfig);
+                                    window.ipc.invoke("setConfig", tempConfig);
+                                }} /><p>开启自定义横幅</p></Space></Col>
+
                             </Card>
                             <Card title="定时任务设置" bordered={false} style={{ margin: 10 }}>
-                                <Col><Space><Switch style={{ margin: 20 }} defaultChecked onChange={(checked: boolean) => {
+                                <Col><Space><Switch style={{ margin: 20 }} defaultChecked={config.useTasks} onChange={(checked: boolean) => {
                                     let tempConfig = config;
                                     tempConfig.useTasks = checked;
+                                    setConfig(tempConfig);
                                     window.ipc.invoke("setConfig", tempConfig);
                                 }} /><p>开启定时任务</p></Space>
                                 </Col>

@@ -15,6 +15,7 @@
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.3",
     "@mui/material": "^5.15.3",
+    "axios": "^1.6.8",
     "electron-serve": "^1.1.0",
     "electron-store": "^8.1.0",
     "react-draggable": "^4.4.6"
